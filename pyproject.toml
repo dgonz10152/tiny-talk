@@ -1,0 +1,25 @@
+[project]
+name = "tiny-talk"
+version = "0.1.0"
+description = "A tiny GPT with a byte-level BPE tokenizer"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.5.3",
+    "regex>=2026.9.29",
+    "torch>=2.14.1",
+]
+
+[project.scripts]
+tiny-talk-train = "tiny_talk.train:main"
+tiny-talk-generate = "tiny_talk.generate:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
