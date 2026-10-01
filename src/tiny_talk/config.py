@@ -1,0 +1,31 @@
+from dataclasses import dataclass
+
+import torch
+
+
+@dataclass
+class GPTConfig:
+    vocab_size: int = 512
+    block_size: int = 128
+    n_embed: int = 120
+    n_head: int = 6
+    n_layer: int = 6
+    dropout: float = 0.2
+
+
+@dataclass
+class TrainConfig:
+    batch_size: int = 64
+    max_iters: int = 5000
+    eval_interval: int = 500
+    eval_iters: int = 200
+    learning_rate: float = 3e-4
+    seed: int = 1337
+
+
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
