@@ -31,7 +31,7 @@ def train(text, gcfg: GPTConfig, tcfg: TrainConfig, device):
     # Training stops early if the text runs out of pairs to merge.
     gcfg.vocab_size = tokenizer.vocab_size
 
-    data = torch.tensor(tokenizer.encode(text), dtype=torch.long)
+    data = torch.tensor(tokenizer.encode(text, allow_special=True), dtype=torch.long)
     train_data, val_data = train_val_split(data)
     splits = {"train": train_data, "val": val_data}
 

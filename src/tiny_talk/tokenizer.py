@@ -4,6 +4,16 @@ from itertools import pairwise
 import regex as re
 
 GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
+SPECIAL_TOKENS = [
+    "<|endoftext|>",
+    "<|system_start|>",
+    "<|system_end|>",
+    "<|user_start|>",
+    "<|user_end|>",
+    "<|assistant_start|>",
+    "<|assistant_end|>",
+]
+SPECIAL_PATTERN = re.compile("(" + "|".join(map(re.escape, SPECIAL_TOKENS)) + ")")
 
 
 class BPETokenizer:
@@ -15,8 +25,14 @@ class BPETokenizer:
         self.compiled_pattern = re.compile(self.pattern)
 
     @property
+    def special_tokens(self):
+        """Special token ids, placed after the bytes and merges."""
+        start = 256 + len(self.merges)
+        return {tok: start + i for i, tok in enumerate(SPECIAL_TOKENS)}
+
+    @property
     def vocab_size(self):
-        return 256 + len(self.merges)
+        return 256 + len(self.merges) + len(SPECIAL_TOKENS)
 
     def _get_stats(self, ids, counts=None, weight=1):
         """Count adjacent id pairs.
@@ -59,14 +75,21 @@ class BPETokenizer:
         return new_ids
 
     def train(self, text, vocab_size):
-        if vocab_size < 256:
-            raise ValueError(f"vocab_size must be at least 256, got {vocab_size}")
-        num_merges = vocab_size - 256
+        min_size = 256 + len(SPECIAL_TOKENS)
+        if vocab_size < min_size:
+            raise ValueError(
+                f"vocab_size must be at least {min_size}, got {vocab_size}"
+            )
+        num_merges = vocab_size - min_size
 
         merges = {}
         # Natural text repeats the same chunks constantly, so work on each
         # unique chunk once and weight its pair counts by how often it occurs.
-        chunk_counts = Counter(re.findall(self.compiled_pattern, text))
+        # Special token strings are dropped so no merges form across them.
+        chunk_counts = Counter()
+        for part in SPECIAL_PATTERN.split(text):
+            if part not in SPECIAL_TOKENS:
+                chunk_counts.update(re.findall(self.compiled_pattern, part))
         chunk_ids = [list(chunk.encode("utf-8")) for chunk in chunk_counts]
         weights = list(chunk_counts.values())
 
@@ -99,21 +122,29 @@ class BPETokenizer:
 
         return tokens
 
-    def encode(self, text):
+    def encode(self, text, allow_special=False):
         """Encode text into token ids.
 
         Args:
             text: Text to encode
+            allow_special: Map special token strings to their ids. Leave off
+                for untrusted text so it cannot inject control tokens.
 
         Returns:
             List of token ids
         """
+        special = self.special_tokens if allow_special else {}
+        parts = SPECIAL_PATTERN.split(text) if allow_special else [text]
         ids = []
         cache = {}
-        for chunk in re.findall(self.compiled_pattern, text):
-            if chunk not in cache:
-                cache[chunk] = self._encode_chunk(chunk.encode("utf-8"))
-            ids.extend(cache[chunk])
+        for part in parts:
+            if part in special:
+                ids.append(special[part])
+                continue
+            for chunk in re.findall(self.compiled_pattern, part):
+                if chunk not in cache:
+                    cache[chunk] = self._encode_chunk(chunk.encode("utf-8"))
+                ids.extend(cache[chunk])
         return ids
 
     def decode(self, ids):
@@ -128,6 +159,8 @@ class BPETokenizer:
         vocab = {i: bytes([i]) for i in range(256)}
         for (i, j), idx in self.merges.items():
             vocab[idx] = vocab[i] + vocab[j]
+        for tok, idx in self.special_tokens.items():
+            vocab[idx] = tok.encode("utf-8")
 
         return b"".join(vocab[idx] for idx in ids).decode("utf-8", errors="replace")
 
