@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -80,6 +82,20 @@ class GPT(nn.Module):
         self.blocks = nn.Sequential(*[Block(cfg) for _ in range(cfg.n_layer)])
         self.ln_f = nn.LayerNorm(cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
+
+        # GPT-2 init. Each block adds two residual branches (attention and MLP)
+        # into the stream, so their output projections are scaled down by
+        # sqrt(2 * n_layer) to keep the stream's variance steady with depth.
+        self.apply(self._init_weights)
+        for name, p in self.named_parameters():
+            if name.endswith(("sa.proj.weight", "ffwd.net.2.weight")):
+                nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * cfg.n_layer))
+
+    def _init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        if isinstance(module, nn.Linear) and module.bias is not None:
+            nn.init.zeros_(module.bias)
 
     def forward(self, idx, targets=None):
         B, T = idx.shape

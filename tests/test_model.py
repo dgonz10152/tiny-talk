@@ -52,3 +52,15 @@ def test_generate_top_k_restricts_choices():
     for _ in range(50):
         tok = next(model.generate(idx, 1, temperature=5.0, top_k=3))
         assert tok.item() in allowed
+
+
+def test_gpt2_init():
+    cfg = GPTConfig(vocab_size=512, block_size=64, n_embed=256, n_head=4, n_layer=4)
+    model = GPT(cfg)
+    block = model.blocks[0]
+    assert abs(block.ffwd.net[0].weight.std().item() - 0.02) < 1e-3
+    assert abs(model.token_embedding_table.weight.std().item() - 0.02) < 1e-3
+    resid_std = 0.02 / (2 * cfg.n_layer) ** 0.5
+    for w in (block.sa.proj.weight, block.ffwd.net[2].weight):
+        assert abs(w.std().item() - resid_std) < 1e-3
+    assert torch.all(block.ffwd.net[0].bias == 0)
