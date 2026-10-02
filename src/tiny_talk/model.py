@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -81,6 +83,20 @@ class GPT(nn.Module):
         self.ln_f = nn.LayerNorm(cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
 
+        # GPT-2 init. Each block adds two residual branches (attention and MLP)
+        # into the stream, so their output projections are scaled down by
+        # sqrt(2 * n_layer) to keep the stream's variance steady with depth.
+        self.apply(self._init_weights)
+        for name, p in self.named_parameters():
+            if name.endswith(("sa.proj.weight", "ffwd.net.2.weight")):
+                nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * cfg.n_layer))
+
+    def _init_weights(self, module):
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        if isinstance(module, nn.Linear) and module.bias is not None:
+            nn.init.zeros_(module.bias)
+
     def forward(self, idx, targets=None):
         B, T = idx.shape
 
@@ -101,11 +117,23 @@ class GPT(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens):
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        """Yield each newly sampled (B, 1) batch of token ids as it is produced.
+
+        Args:
+            idx: (B, T) context token ids
+            max_new_tokens: Number of tokens to sample
+            temperature: Below 1 sharpens the distribution, above 1 flattens it
+            top_k: If set, sample only from the k most likely tokens
+        """
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.cfg.block_size :]
             logits, _ = self(idx_cond)
-            probs = F.softmax(logits[:, -1, :], dim=-1)
+            logits = logits[:, -1, :] / temperature
+            if top_k is not None:
+                kth = torch.topk(logits, min(top_k, logits.size(-1))).values[:, [-1]]
+                logits = logits.masked_fill(logits < kth, float("-inf"))
+            probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
-        return idx
+            yield idx_next
