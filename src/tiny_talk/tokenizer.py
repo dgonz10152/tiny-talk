@@ -1,3 +1,4 @@
+import json
 from collections import Counter
 from itertools import pairwise
 
@@ -163,6 +164,17 @@ class BPETokenizer:
             vocab[idx] = tok.encode("utf-8")
 
         return b"".join(vocab[idx] for idx in ids).decode("utf-8", errors="replace")
+
+    def save(self, path):
+        with open(path, "w") as f:
+            json.dump([[a, b, idx] for (a, b), idx in self.merges.items()], f)
+
+    @classmethod
+    def load(cls, path):
+        tokenizer = cls()
+        with open(path) as f:
+            tokenizer.merges = {(a, b): idx for a, b, idx in json.load(f)}
+        return tokenizer
 
 
 if __name__ == "__main__":

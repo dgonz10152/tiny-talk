@@ -23,7 +23,9 @@ def main():
     model.load_state_dict(ckpt["model"])
     model.eval()
 
-    context = torch.tensor([tokenizer.encode("\n")], dtype=torch.long, device=device)
+    # Training docs start with <|endoftext|>, so seed with it.
+    eot = tokenizer.special_tokens["<|endoftext|>"]
+    context = torch.tensor([[eot]], dtype=torch.long, device=device)
     print(tokenizer.decode(model.generate(context, args.max_new_tokens)[0].tolist()))
 
 
