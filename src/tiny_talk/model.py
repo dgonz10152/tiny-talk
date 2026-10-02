@@ -101,11 +101,23 @@ class GPT(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens):
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        """Yield each newly sampled (B, 1) batch of token ids as it is produced.
+
+        Args:
+            idx: (B, T) context token ids
+            max_new_tokens: Number of tokens to sample
+            temperature: Below 1 sharpens the distribution, above 1 flattens it
+            top_k: If set, sample only from the k most likely tokens
+        """
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.cfg.block_size :]
             logits, _ = self(idx_cond)
-            probs = F.softmax(logits[:, -1, :], dim=-1)
+            logits = logits[:, -1, :] / temperature
+            if top_k is not None:
+                kth = torch.topk(logits, min(top_k, logits.size(-1))).values[:, [-1]]
+                logits = logits.masked_fill(logits < kth, float("-inf"))
+            probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
-        return idx
+            yield idx_next

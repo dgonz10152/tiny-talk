@@ -148,6 +148,23 @@ class BPETokenizer:
                 ids.extend(cache[chunk])
         return ids
 
+    def decode_bytes(self, ids):
+        """Decode token ids into raw bytes, which may end mid UTF-8 character.
+
+        Args:
+            ids: List of token ids
+
+        Returns:
+            Decoded bytes
+        """
+        vocab = {i: bytes([i]) for i in range(256)}
+        for (i, j), idx in self.merges.items():
+            vocab[idx] = vocab[i] + vocab[j]
+        for tok, idx in self.special_tokens.items():
+            vocab[idx] = tok.encode("utf-8")
+
+        return b"".join(vocab[idx] for idx in ids)
+
     def decode(self, ids):
         """Decode token ids back into text.
 
@@ -157,13 +174,7 @@ class BPETokenizer:
         Returns:
             Decoded text
         """
-        vocab = {i: bytes([i]) for i in range(256)}
-        for (i, j), idx in self.merges.items():
-            vocab[idx] = vocab[i] + vocab[j]
-        for tok, idx in self.special_tokens.items():
-            vocab[idx] = tok.encode("utf-8")
-
-        return b"".join(vocab[idx] for idx in ids).decode("utf-8", errors="replace")
+        return self.decode_bytes(ids).decode("utf-8", errors="replace")
 
     def save(self, path):
         with open(path, "w") as f:

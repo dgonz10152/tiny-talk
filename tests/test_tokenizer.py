@@ -59,3 +59,14 @@ def test_training_skips_special_token_strings():
     tok = BPETokenizer()
     tok.train("<|endoftext|>".join(["ab"] * 50), 258 + len(SPECIAL_TOKENS))
     assert list(tok.merges) == [(ord("a"), ord("b"))]
+
+
+def test_decode_bytes_streams_split_utf8():
+    # Byte-level tokens can split a character; incremental decoding rejoins it.
+    import codecs
+
+    tok = BPETokenizer()
+    ids = tok.encode("ünï 🙂")
+    utf8 = codecs.getincrementaldecoder("utf-8")()
+    out = "".join(utf8.decode(tok.decode_bytes([i])) for i in ids)
+    assert out + utf8.decode(b"", final=True) == "ünï 🙂"
