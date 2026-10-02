@@ -7,9 +7,9 @@ import torch
 class GPTConfig:
     vocab_size: int = 1024
     block_size: int = 512
-    n_embed: int = 512
-    n_head: int = 8
-    n_layer: int = 12
+    n_embed: int = 384
+    n_head: int = 6
+    n_layer: int = 8
     dropout: float = 0
 
     def __post_init__(self):
@@ -21,7 +21,7 @@ class GPTConfig:
 
 @dataclass
 class TrainConfig:
-    batch_size: int = 40
+    batch_size: int = 20
     max_iters: int = 5000
     eval_interval: int = 500
     eval_iters: int = 200
