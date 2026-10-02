@@ -37,10 +37,23 @@ def lr_factor(step, tcfg: TrainConfig):
     return tcfg.min_lr_ratio + (1 - tcfg.min_lr_ratio) * cosine
 
 
+def configure_optimizer(model, tcfg: TrainConfig):
+    """AdamW that decays only 2D weights (matmuls, embeddings), not biases or norms."""
+    params = list(model.parameters())
+    return torch.optim.AdamW(
+        [
+            {"params": [p for p in params if p.dim() >= 2]},
+            {"params": [p for p in params if p.dim() < 2], "weight_decay": 0.0},
+        ],
+        lr=tcfg.learning_rate,
+        weight_decay=tcfg.weight_decay,
+    )
+
+
 def train(splits, gcfg: GPTConfig, tcfg: TrainConfig, device):
     train_data = splits["train"]
     model = GPT(gcfg).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=tcfg.learning_rate)
+    optimizer = configure_optimizer(model, tcfg)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, functools.partial(lr_factor, tcfg=tcfg)
     )
@@ -59,6 +72,8 @@ def train(splits, gcfg: GPTConfig, tcfg: TrainConfig, device):
         _, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        if tcfg.grad_clip:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), tcfg.grad_clip)
         optimizer.step()
         scheduler.step()
 

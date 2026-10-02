@@ -28,6 +28,8 @@ class TrainConfig:
     learning_rate: float = 6e-4
     warmup_iters: int = 200  # linear warmup from ~0 up to learning_rate
     min_lr_ratio: float = 0.1  # cosine decay floor, as a fraction of learning_rate
+    weight_decay: float = 0.1  # applied to 2D weights only
+    grad_clip: float = 1.0  # max global grad norm; 0 disables
     seed: int = 1337
 
 
