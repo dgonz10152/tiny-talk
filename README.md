@@ -12,7 +12,8 @@ uv sync
 
 ```sh
 uv run tiny-talk-prepare     # streams 250k TinyStories stories, trains the BPE tokenizer, writes data/tinystories/{train,val}.bin + merges.json
-uv run tiny-talk-train       # trains on data/tinystories, saves checkpoints/model.pt
+uv run tiny-talk-train       # trains on data/tinystories; checkpoints every eval to checkpoints/model.pt (+ model_best.pt)
+uv run tiny-talk-train --resume checkpoints/model.pt   # continues an interrupted run
 uv run tiny-talk-generate "Once upon a time"   # streams a story until <|endoftext|> (--temperature, --top-k)
 uv run pytest
 ```
