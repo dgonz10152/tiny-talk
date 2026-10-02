@@ -12,6 +12,12 @@ class GPTConfig:
     n_layer: int = 6
     dropout: float = 0.2
 
+    def __post_init__(self):
+        if self.n_embed % self.n_head:
+            raise ValueError(
+                f"n_embed ({self.n_embed}) must be divisible by n_head ({self.n_head})"
+            )
+
 
 @dataclass
 class TrainConfig:
