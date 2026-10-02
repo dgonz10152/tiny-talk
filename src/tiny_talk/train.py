@@ -1,4 +1,6 @@
 import argparse
+import functools
+import math
 import os
 from dataclasses import asdict
 
@@ -25,16 +27,30 @@ def estimate_loss(model, splits, tcfg: TrainConfig, device):
     return out
 
 
+def lr_factor(step, tcfg: TrainConfig):
+    """Linear warmup, then cosine decay to min_lr_ratio, as a multiple of the peak lr."""
+    if step < tcfg.warmup_iters:
+        return (step + 1) / tcfg.warmup_iters
+    decay_steps = max(1, tcfg.max_iters - tcfg.warmup_iters)
+    progress = min(1.0, (step - tcfg.warmup_iters) / decay_steps)
+    cosine = 0.5 * (1 + math.cos(math.pi * progress))
+    return tcfg.min_lr_ratio + (1 - tcfg.min_lr_ratio) * cosine
+
+
 def train(splits, gcfg: GPTConfig, tcfg: TrainConfig, device):
     train_data = splits["train"]
     model = GPT(gcfg).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=tcfg.learning_rate)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, functools.partial(lr_factor, tcfg=tcfg)
+    )
 
     for i in range(tcfg.max_iters + 1):
         if i % tcfg.eval_interval == 0 or i == tcfg.max_iters:
             losses = estimate_loss(model, splits, tcfg, device)
             print(
-                f"Step {i}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
+                f"Step {i}: train loss {losses['train']:.4f}, "
+                f"val loss {losses['val']:.4f}, lr {scheduler.get_last_lr()[0]:.2e}"
             )
         if i == tcfg.max_iters:
             break
@@ -44,6 +60,7 @@ def train(splits, gcfg: GPTConfig, tcfg: TrainConfig, device):
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
     return model
 

@@ -20,6 +20,8 @@ class TrainConfig:
     eval_interval: int = 500
     eval_iters: int = 200
     learning_rate: float = 3e-4
+    warmup_iters: int = 200  # linear warmup from ~0 up to learning_rate
+    min_lr_ratio: float = 0.1  # cosine decay floor, as a fraction of learning_rate
     seed: int = 1337
 
 
