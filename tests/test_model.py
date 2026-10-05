@@ -64,3 +64,8 @@ def test_gpt2_init():
     for w in (block.sa.proj.weight, block.ffwd.net[2].weight):
         assert abs(w.std().item() - resid_std) < 1e-3
     assert torch.all(block.ffwd.net[0].bias == 0)
+
+
+def test_output_projection_tied_to_embedding():
+    model = GPT(CFG)
+    assert model.lm_head.weight is model.token_embedding_table.weight

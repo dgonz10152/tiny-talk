@@ -41,7 +41,7 @@ Input tokens
     |--- Residual Add
 [Final LayerNorm]
     |
-[Output Projection (untied)]
+[Output Projection (weight-tied)]
     |
 Next token logits
 ```

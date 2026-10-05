@@ -81,7 +81,9 @@ class GPT(nn.Module):
         self.position_embedding_table = nn.Embedding(cfg.block_size, cfg.n_embed)
         self.blocks = nn.Sequential(*[Block(cfg) for _ in range(cfg.n_layer)])
         self.ln_f = nn.LayerNorm(cfg.n_embed)
-        self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
+        self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size, bias=False)
+        # Weight tying: the input embedding doubles as the output projection.
+        self.lm_head.weight = self.token_embedding_table.weight
 
         # GPT-2 init. Each block adds two residual branches (attention and MLP)
         # into the stream, so their output projections are scaled down by
