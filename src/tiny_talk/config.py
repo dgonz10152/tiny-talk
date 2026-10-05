@@ -6,17 +6,30 @@ import torch
 @dataclass
 class GPTConfig:
     vocab_size: int = 1024
-    block_size: int = 512
+    block_size: int = 256
     n_embed: int = 384
     n_head: int = 6
     n_layer: int = 8
     dropout: float = 0
+    rope_theta: float = 10000.0
+    # MLA: keys/values are rebuilt from a kv_lora_rank latent, plus one shared
+    # qk_rope_dim key per token that carries position.
+    kv_lora_rank: int = 128
+    qk_rope_dim: int = 32
+    # Sparse attention: a small indexer picks the index_topk keys each query
+    # attends to.
+    index_n_heads: int = 4
+    index_head_dim: int = 32
+    index_topk: int = 128
 
     def __post_init__(self):
         if self.n_embed % self.n_head:
             raise ValueError(
                 f"n_embed ({self.n_embed}) must be divisible by n_head ({self.n_head})"
             )
+        for name in ("qk_rope_dim", "index_head_dim"):
+            if getattr(self, name) % 2:
+                raise ValueError(f"{name} must be even for RoPE")
 
 
 @dataclass
